@@ -105,10 +105,15 @@ streamlit run dashboard_stf.py
 projeto-STF/
 │
 ├── limpeza_dados.py
+
 ├── dashboard_stf.py
+
 ├── decisoes_STF.xlsx
+
 ├── decisoes_stf_limpo.xlsx
+
 ├── requirements.txt
+
 └── README.md
 
 ## 6. Insights e Resultados
