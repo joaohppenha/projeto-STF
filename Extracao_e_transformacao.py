@@ -68,10 +68,11 @@ if all(col in df.columns for col in ['data_baixa', 'data_autuacao']):
 else:
     df['tempo_julgamento_dias'] = pd.NA
 
-# Tratamento de Nulos
-
+# Tratamento de Nulos (corrigido: usa pd.NA ao invés de None)
 if 'tempo_julgamento_dias' in df.columns:
-    df['tempo_julgamento_dias'] = df['tempo_julgamento_dias'].apply(lambda x: x if pd.notnull(x) and x >= 0 else None)
+    df['tempo_julgamento_dias'] = df['tempo_julgamento_dias'].apply(
+        lambda x: x if pd.notnull(x) and x >= 0 else pd.NA
+    )
 
 # Remoção de duplicatas
 df = df.drop_duplicates()
@@ -91,7 +92,6 @@ print(df['tempo_julgamento_dias'].describe())
 
 # Exportar Novo Arquivo Limpo
 arquivo_limpo = r'C:\Users\joaoh\OneDrive\Área de Trabalho\Projeto_STF\decisoes_stf_limpo.xlsx'
-
 
 os.makedirs(os.path.dirname(arquivo_limpo), exist_ok=True)
 
