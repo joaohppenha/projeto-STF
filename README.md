@@ -1,148 +1,71 @@
-# **<u>Projeto STF — Limpeza de Dados e Dashboard Interativo</u>**
+# Analise de Eficiencia Jurisprudencial — STF
 
-## 1. Descrição do Projeto
-Este projeto analisa decisões do STF a partir de dados públicos, realizando limpeza e padronização, e apresentando insights por meio de um dashboard interativo.
+## 1. Descricao do Projeto
+Este projeto aplica tecnicas de Ciencia de Dados e Analytics sobre dados publicos do Supremo Tribunal Federal (STF) para diagnosticar a performance processual da corte. Atraves de um pipeline de Data Wrangling em Python e um dashboard interativo desenvolvido em Streamlit, o projeto transforma dados brutos em inteligencia estrategica, permitindo a analise de gargalos operacionais e padroes de julgamento.
 
-O projeto responde perguntas como:
-- Qual o tempo médio de julgamento por ministro?
-- Quantas decisões finais existem por classe?
-- Qual ministro tem maior eficiência (mais decisões em menor tempo)?
-- Quais padrões surgem ao longo dos anos?
+O projeto responde a perguntas criticas de negocio e gestao, tais como:
+* Qual o lead time (tempo medio de julgamento) segregado por Ministro?
+* Qual a distribuicao de decisoes finais por classe processual?
+* Quais Ministros apresentam maior eficiencia relativa (volume de decisoes vs. tempo)?
+* Quais padroes de produtividade emergem na serie historica analisada?
 
----
+## 2. Tecnologias e Metodologias Aplicadas
 
-## 2. Tecnologias e Conhecimentos Aplicados
+### 2.1 Python e Data Wrangling (Pandas)
+* Manipulacao de datasets complexos e tratamento de inconsistencias em dados juridicos.
+* Preprocessamento e normalizacao de registros e conversao de tipos de dados.
+* Feature Engineering: Criacao de metricas derivadas, como o calculo de tempo transcorrido ate o julgamento.
+* Higienizacao de valores ausentes (NaN) e remocao de duplicatas para garantia da integridade analitica.
 
-### 2.1 Python
-Conhecimentos aplicados:
-- Leitura e escrita de arquivos (Excel)
-- Manipulação de dados com DataFrames
-- Tratamento de valores faltantes e padronização
-- Criação de novas colunas e cálculos
-- Controle de fluxo e validação de dados
+### 2.2 Visual Analytics (Streamlit e Plotly)
+* Desenvolvimento de Data App para apresentacao de resultados em tempo real.
+* Implementacao de filtros dinamicos (multiselect e sliders) para exploracao granular dos dados.
+* Utilizacao de graficos interativos e analise de dispersao (Boxplots) para identificacao de outliers no tempo de julgamento.
+* Monitoramento de KPIs atraves de metricas e indicadores de performance.
 
-### 2.2 Pandas
-Conhecimentos aplicados:
-- Leitura de dados (`read_excel`)
-- Transformação e limpeza (normalização, conversão de tipos)
-- Tratamento de duplicatas e valores nulos
-- Criação de colunas calculadas (ex.: tempo de julgamento)
-- Exportação de arquivo limpo (`to_excel`)
+### 2.3 Engenharia e Boas Praticas
+* Versionamento de codigo utilizando Git.
+* Gerenciamento de dependencias e ambientes virtuais (venv).
+* Otimizacao de processamento com feedback visual via TQDM.
 
-### 2.3 Streamlit
-Conhecimentos aplicados:
-- Construção de interface web simples e interativa
-- Criação de filtros (multiselect, slider)
-- Apresentação de métricas e cards
-- Visualização de dados com gráficos interativos
-- Exportação de dados em CSV via download
+## 3. Estrutura do Pipeline
 
-### 2.4 Plotly
-Conhecimentos aplicados:
-- Criação de gráficos interativos (barras, boxplot, pizza)
-- Configuração de layout e estilos
-- Manipulação de dados para visualização
+### Fase 1: ETL e Limpeza (limpeza_dados.py)
+O script automatiza a leitura da base original, executa a padronizacao de colunas e valores, realiza o parsing de datas e exporta um dataset otimizado para consumo analitico (decisoes_stf_limpo.xlsx).
 
-### 2.5 TQDM
-Conhecimentos aplicados:
-- Barra de progresso em loops de processamento
-- Melhor experiência durante o processamento de dados
-
-### 2.6 Git
-Conhecimentos aplicados:
-- Versionamento de código
-- Histórico de commits
-- Organização do projeto em repositório
-
----
-
-## 3. Projetos Incluídos
-
-### Projeto 1 — Limpeza de Dados (Python)
-O script realiza:
-- leitura do arquivo Excel original
-- padronização de colunas e valores
-- conversão de datas
-- criação de colunas calculadas (ex.: tempo de julgamento)
-- remoção de duplicatas
-- exportação do arquivo limpo
-
-Saída: `decisoes_stf_limpo.xlsx`
-
----
-
-### Projeto 2 — Dashboard Interativo (Streamlit)
-O dashboard carrega o arquivo limpo e permite:
-- filtros por ministro, classe e tempo de julgamento
-- métricas e KPIs
-- gráficos interativos (barras, boxplot, pizza)
-- tabela de eficiência dos ministros
-- download de CSV
-
----
+### Fase 2: Business Intelligence (dashboard_stf.py)
+Interface que consome o dado processado e permite a exploracao de insights, tabelas de eficiencia e visualizacoes estatisticas avançadas.
 
 ## 4. Como Executar
 
-### 4.1 Clonar o repositório
-
+### 4.1 Clonar o repositorio
 git clone https://github.com/joaohppenha/projeto-STF.git
 
-### 4.2 Criar ambiente virtual
+### 4.2 Configurar ambiente virtual
 python3 -m venv venv
-source venv/bin/activate   # Linux/Mac
-venv\Scripts\activate      # Windows
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
 
-### 4.3 Instalar dependências
+### 4.3 Instalar dependencias
 pip install -r requirements.txt
 
-### 4.4 Executar a limpeza de dados
+### 4.4 Executar o processamento e o dashboard
 python limpeza_dados.py
-
-### 4.5 Executar o dashboard
 streamlit run dashboard_stf.py
 
-## 5. Estrutura do Repositório
+## 5. Estrutura do Repositorio
 projeto-STF/
-│
-├── limpeza_dados.py
+├── limpeza_dados.py          # Script de processamento e ETL
+├── dashboard_stf.py          # Aplicacao Streamlit
+├── decisoes_STF.xlsx         # Raw Data (Dados Brutos)
+├── decisoes_stf_limpo.xlsx   # Processed Data (Dados Limpos)
+├── requirements.txt          # Dependencias do projeto
+└── README.md                 # Documentacao
 
-├── dashboard_stf.py
+## 6. Insights e Resultados Obtidos
+A analise permite identificar disparidades no tempo de julgamento entre diferentes classes processuais e perfis de produtividade por relatoria. A ferramenta serve como suporte para diagnosticos de eficiencia juridica, permitindo identificar quais classes demandam maior tempo de analise e como a carga de trabalho esta distribuida entre os Ministros.
 
-├── decisoes_STF.xlsx
-
-├── decisoes_stf_limpo.xlsx
-
-├── requirements.txt
-
-└── README.md
-
-## 6. Insights e Resultados
-
-É possível analisar o tempo de julgamento por ministro e por classe.
-
-O dashboard permite identificar:
-
-quantidade de decisões finais por classe
-
-participação de cada ministro
-
-eficiência (decisões por tempo)
-
-O projeto ajuda a visualizar padrões de desempenho e eficiência no STF.
-
-## 7. Possíveis Melhorias
-
-Adicionar filtros por ano e por assunto do processo.
-
-Implementar análise de outliers no tempo de julgamento.
-
-Criar comparação temporal por ano.
-
-Publicar o dashboard online (Streamlit Cloud).
-
-## 8. Observações
-
-Os caminhos do arquivo são absolutos (ex.: C:\Users\...).
-Para facilitar a execução em outros computadores, é recomendado usar caminhos relativos ou variáveis de ambiente.
-cd projeto-STF
-
+## 7. Proximas Etapas e Escalabilidade
+* Implementacao de analise preditiva para estimativa de desfechos baseada em series historicas.
+* Migracao do armazenamento de arquivos Excel para Banco de Dados Relacional (PostgreSQL).
+* Deploy da aplicacao em ambiente Cloud (Streamlit Cloud ou AWS).
