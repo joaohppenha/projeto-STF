@@ -2,217 +2,130 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import numpy as np
+import os
 
+# Configuração da página - Tema e Layout
+st.set_page_config(page_title="Analytics STF | Jurisprudência Estratégica", layout="wide")
 
-st.set_page_config(page_title="Dashboard STF", layout="wide")
-
-# 1. Carregamento dados
+# 1. Carregamento e Tratamento de Dados (Data Wrangling)
 @st.cache_data
 def carregar_dados():
-    df = pd.read_excel(r"C:\Users\joaoh\OneDrive\Área de Trabalho\Projeto_STF\decisoes_stf_limpo.xlsx")
-    df = df[['nome_ministro', 'tempo_julgamento_dias', 'classe', 'ano da decisão',  'indicador_tramitacao', 'subgrupo andamento decisão', 'assuntos_processo']]
+    # Usando caminho relativo para garantir portabilidade no GitHub
+    caminho_arquivo = "decisoes_stf_limpo.xlsx"
+    
+    if not os.path.exists(caminho_arquivo):
+        st.error(f"Arquivo {caminho_arquivo} não encontrado no diretório local.")
+        return pd.DataFrame()
+
+    df = pd.read_excel(caminho_arquivo)
+    
+    # Seleção de features relevantes
+    cols = ['nome_ministro', 'tempo_julgamento_dias', 'classe', 'ano da decisão', 
+            'indicador_tramitacao', 'subgrupo andamento decisão', 'assuntos_processo']
+    df = df[cols].copy()
+    
+    # Casting e Limpeza
     df['tempo_julgamento_dias'] = pd.to_numeric(df['tempo_julgamento_dias'], errors='coerce')
     df.dropna(subset=['nome_ministro', 'tempo_julgamento_dias'], inplace=True)
+    
     return df
 
-df = carregar_dados()
+df_raw = carregar_dados()
 
-st.title("Dashboard Interativo - Decisões do STF")
-
-# 2. Filtros laterais
-st.sidebar.header("Filtros")
-ministros = st.sidebar.multiselect("Ministro:", df['nome_ministro'].unique(), default=df['nome_ministro'].unique())
-classe = st.sidebar.multiselect("Classe:", df['classe'].dropna().unique(), default=df['classe'].dropna().unique())
-tempo_min, tempo_max = st.sidebar.slider("Tempo de julgamento (dias):",
-    int(df['tempo_julgamento_dias'].min()),
-    int(df['tempo_julgamento_dias'].max()),
-    (30, 500)
-)
-
-df_filtrado = df[
-    (df['nome_ministro'].isin(ministros)) &
-    (df['classe'].isin(classe)) &
-    (df['tempo_julgamento_dias'].between(tempo_min, tempo_max))
-]
-
-st.markdown(f"**Total de registros filtrados:** {len(df_filtrado)}")
-
-
-
-
-# 2.  Medidas: 
-
-# total de ações  - contagem de linhas de ações
-total_acoes = df["classe"].dropna().shape[0]
-# Total de Ministros - contagem de nomes únicos
-
-total_ministros = df["nome_ministro"].nunique()
-
-#Total de Dias de julgamentos
-
-total_tempo_julgamento = df["tempo_julgamento_dias"].sum()
-
-# Contagem de  linhas com "DECISÃO FINAL" na coluna
-total_decisoes_finais = (df["subgrupo andamento decisão"] == "DECISÃO FINAL").sum()
-
-# Contagem de Ações em Tramitação
-total_tramitacao = df["indicador_tramitacao"].dropna().str.strip().str.upper().eq("SIM").sum()
-
-
-# 3. Cards
-
-col1, col2, col3, col4, col5 = st.columns(5)
-
-with col1:
-    # Card com o total de ações
-    st.metric("Total de Ações do STF", f"{total_acoes:,}")
-
-with col2:
-    # Card com o total de ministros
-    st.metric("Total de Ministros", f"{total_ministros:,}")
-
-with col3:
-    # Card total de dias de julgamento
-    st.metric("Total de Tempo de Julgamento (dias)", f"{total_tempo_julgamento:,}")
-
-with col4:
-    # Card de decisões finais
-    st.metric("Decisões Finais", f"{total_decisoes_finais:,}")
-
-with col5:
-    # Card de ações em tramitação
-    st.metric("Ações em Tramitação", f"{total_tramitacao:,}")
-
-
-
-col6, col7 = st.columns(2)
-
-
-# Gráficos
-
-
-#Formatação
-
-def format_plot(fig):
-    fig.update_layout(
-        title_x=0.5,
-        autosize=True,
-        margin=dict(t=80, b=40, l=40, r=40),
+if not df_raw.empty:
+    # --- SIDEBAR: Filtros Inteligentes ---
+    st.sidebar.header("Parâmetros de Análise")
+    
+    ministros = st.sidebar.multiselect(
+        "Corpo Julgador:", 
+        options=sorted(df_raw['nome_ministro'].unique()), 
+        default=df_raw['nome_ministro'].unique()
     )
-    fig.update_xaxes(tickangle=-45, automargin=True)
-    fig.update_yaxes(automargin=True)
-    return fig
-
-
-
-# === Agrupamento por CLASSE ===
-decisoes_por_classe = (
-    df[df["subgrupo andamento decisão"].str.upper().str.strip() == "DECISÃO FINAL"]
-    .groupby("classe")
-    .size()
-    .reset_index(name="total_decisoes_finais")
-)
-
-# Gráficos de Barras
-decisoes_por_ministro = (
-    df[df["subgrupo andamento decisão"].str.upper().str.strip() == "DECISÃO FINAL"]
-    .groupby("nome_ministro")
-    .size()
-    .reset_index(name="total_decisoes_finais")
-)
-
-col8, col9 = st.columns(2)
-
-with col8:
-    # Gráfico 1 - Decisões Finais por Classe (barras verticais)
-    fig1 = px.bar(
-        decisoes_por_classe,
-        x="classe",
-        y="total_decisoes_finais",
-        color="classe",
-        text="total_decisoes_finais",
-        title="Decisões  por tipo de Ação",
-        color_discrete_sequence=px.colors.qualitative.Set2
+    
+    classes = st.sidebar.multiselect(
+        "Classe Processual:", 
+        options=sorted(df_raw['classe'].dropna().unique()), 
+        default=df_raw['classe'].dropna().unique()
     )
-    fig1.update_traces(textposition="outside")
-    fig1.update_layout(
-        xaxis_title="Classe",
-        yaxis_title="Total de Decisões Finais",
-        showlegend=False,
-        title_x=0.5
+    
+    # Slider com percentis para evitar que outliers extremos estraguem a escala
+    min_val = int(df_raw['tempo_julgamento_dias'].min())
+    max_val = int(df_raw['tempo_julgamento_dias'].max())
+    
+    tempo_range = st.sidebar.slider(
+        "Janela de Tempo (Dias):",
+        min_val, max_val, (min_val, 1000) # Default para focar no grosso das ações
     )
-    st.plotly_chart(fig1, use_container_width=True)
 
-with col9:
-    # Gráfico 2 - Decisões Finais por Ministro (barras horizontais)
-    fig2 = px.bar(
-        decisoes_por_ministro,
-        x="total_decisoes_finais",
-        y="nome_ministro",
-        orientation="h",
-        color="nome_ministro",
-        text="total_decisoes_finais",
-        title="Decisões  por Ministro",
-        color_discrete_sequence=px.colors.qualitative.Pastel
+    # Aplicação dos Filtros
+    mask = (
+        df_raw['nome_ministro'].isin(ministros) & 
+        df_raw['classe'].isin(classes) & 
+        df_raw['tempo_julgamento_dias'].between(*tempo_range)
     )
-    fig2.update_traces(textposition="outside")
-    fig2.update_layout(
-        xaxis_title="Total de Decisões Finais",
-        yaxis_title="Ministro",
-        showlegend=False,
-        title_x=0.5
-    )
-    st.plotly_chart(fig2, use_container_width=True)
+    df = df_raw[mask]
 
-# Gráfico de Linhas
+    # --- HEADER: Títulos e KPIs ---
+    st.title("⚖️ Analytics STF: Desempenho e Jurisprudência")
+    st.markdown("### Diagnóstico Estatístico de Eficiência Processual")
+    
+    # Cálculos de Métricas
+    total_acoes = len(df)
+    mediana_tempo = df['tempo_julgamento_dias'].median()
+    desvio_padrao = df['tempo_julgamento_dias'].std()
+    taxa_decisao_final = (df["subgrupo andamento decisão"] == "DECISÃO FINAL").mean() * 100
 
-with col6:
-    # 3. Boxplot interativo
-    st.subheader("Tempo de julgamento por ministro")
-    fig1 = px.box(
-        df_filtrado,
-        x="nome_ministro",
-        y="tempo_julgamento_dias",
-        points="all",
-        color="nome_ministro",
-        title="Distribuição do tempo de julgamento"
-    )
-    st.plotly_chart(fig1, use_container_width=True)
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    kpi1.metric("Volume Analisado", f"{total_acoes:,}")
+    kpi2.metric("Mediana Lead Time", f"{mediana_tempo:.0f} dias", help="A mediana é mais robusta a outliers que a média.")
+    kpi3.metric("Desvio Padrão", f"{desvio_padrao:.1f} d", help="Mede a variabilidade/imprevisibilidade dos julgamentos.")
+    kpi4.metric("Taxa de Decisões Finais", f"{taxa_decisao_final:.1f}%")
 
-with col7:
-    # 4. Gráfico de pizza
-    st.subheader("Distribuição de ações por ministro")
-    acoes_por_ministro = df_filtrado['nome_ministro'].value_counts().reset_index()
-    acoes_por_ministro.columns = ['nome_ministro', 'qtd_acoes']
+    st.divider()
 
-    fig2 = px.pie(
-        acoes_por_ministro,
-        values='qtd_acoes',
-        names='nome_ministro',
-        title="Participação dos ministros nas decisões"
-    )
-    st.plotly_chart(fig2, use_container_width=True)
+    # --- BODY: Visual Analytics ---
+    col_left, col_right = st.columns(2)
 
+    with col_left:
+        # Gráfico 1: Boxplot (Fundamentação Estatística)
+        st.subheader("Dispersão por Relatoria")
+        fig_box = px.box(
+            df, x="nome_ministro", y="tempo_julgamento_dias", 
+            color="nome_ministro", points="outliers",
+            title="Variabilidade do Tempo de Julgamento",
+            labels={'tempo_julgamento_dias': 'Dias', 'nome_ministro': 'Ministro'}
+        )
+        fig_box.update_layout(showlegend=False)
+        st.plotly_chart(fig_box, use_container_width=True)
 
+    with col_right:
+        # Gráfico 2: Pareto de Classes
+        st.subheader("Concentração por Classe")
+        df_classe = df['classe'].value_counts().reset_index()
+        fig_pie = px.pie(
+            df_classe, values='count', names='classe', 
+            hole=.4, title="Distribuição de Demandas",
+            color_discrete_sequence=px.colors.qualitative.Pastel
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
 
-# 5. Tabela com visualização condicional
-st.subheader("Tabela de eficiência dos ministros")
-tempo_medio = df_filtrado.groupby('nome_ministro')['tempo_julgamento_dias'].mean().reset_index()
-eficiencia = pd.merge(acoes_por_ministro, tempo_medio, on='nome_ministro')
-eficiencia['eficiencia'] = eficiencia['qtd_acoes'] / eficiencia['tempo_julgamento_dias']
-eficiencia.sort_values(by='eficiencia', ascending=False, inplace=True)
+    # --- SEÇÃO INFERIOR: Tabela de Eficiência Avançada ---
+    st.subheader("Ranking de Eficiência Operacional")
+    
+    # Agrupamento Estatístico
+    stats_ministro = df.groupby('nome_ministro').agg({
+        'tempo_julgamento_dias': ['count', 'mean', 'median', 'std']
+    }).reset_index()
+    
+    # Flattening nas colunas
+    stats_ministro.columns = ['Ministro', 'Qtd Ações', 'Média Dias', 'Mediana Dias', 'Desvio Padrão']
+    
+    # Índice de Eficiência João (Normalizado: Ações por Tempo Médio)
+    stats_ministro['Score Eficiência'] = (stats_ministro['Qtd Ações'] / stats_ministro['Mediana Dias']).round(4)
+    stats_ministro = stats_ministro.sort_values(by='Score Eficiência', ascending=False)
 
-st.dataframe(
-    eficiencia.style.background_gradient(subset='eficiencia', cmap='Greens'),
-    use_container_width=True
-)
-
-
-# 7. Exportar CSV
-with st.expander("Exportar tabela de eficiência"):
-    st.download_button(
-        label="Baixar como CSV",
-        data=eficiencia.to_csv(index=False),
-        file_name="eficiencia_ministros.csv",
-        mime="text/csv"
-    )
+    # Renderização com Gradiente
+    st.dataframe(
+        stats_ministro.style.background_gradient(subset=['Score Eficiência'], cmap='YlGn')
+        .format(precision=2),
+        use_container
