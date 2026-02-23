@@ -1,102 +1,96 @@
 import pandas as pd
 import os
 from tqdm import tqdm
+import numpy as np
 
-# Importa a Planilha de decisões do STF e verifica a existência do arquivo
+def limpar_dados_stf():
+    # 1. Configuração de Caminhos (Portabilidade para GitHub/Produção)
+    # Busca o arquivo no diretório atual do script
+    diretorio_atual = os.path.dirname(os.path.abspath(__file__))
+    arquivo_original = os.path.join(diretorio_atual, 'decisoes_STF.xlsx')
+    arquivo_limpo = os.path.join(diretorio_atual, 'decisoes_stf_limpo.xlsx')
 
-arquivo_original = r'C:\Users\joaoh\OneDrive\Área de Trabalho\Projeto_STF\decisoes_STF.xlsx'
+    print(f"Iniciando Pipeline de Preprocessamento...")
+    
+    if not os.path.exists(arquivo_original):
+        print(f"ERRO: O arquivo {arquivo_original} nao foi encontrado.")
+        return
 
-if not os.path.exists(arquivo_original):
-    raise FileNotFoundError(f" Arquivo não encontrado: {arquivo_original}")
+    # 2. Carga de Dados
+    print("Carregando base de dados (Excel)...")
+    df = pd.read_excel(arquivo_original, engine='openpyxl')
 
-df = pd.read_excel(arquivo_original, engine='openpyxl')
+    # 3. Padronização de Schema (Colunas)
+    df.columns = df.columns.str.strip().str.lower()
 
-##########################################################################################################################
-# Limpeza de Dados
-##########################################################################################################################
+    # Dicionário de Renomeação para legibilidade (Snake Case)
+    rename_dict = {
+        'nome ministro(a)': 'nome_ministro',
+        'data de autuação': 'data_autuacao',
+        'data baixa': 'data_baixa',
+        'data da decisão': 'data_decisao',
+        'origem da decisão': 'origem_decisao',
+        'ramo direito': 'ramo_direito',
+        'assuntos do processo': 'assuntos_processo',
+        'indicador de tramitação': 'indicador_tramitacao',
+        'ano da decisão': 'ano_da_decisao'
+    }
+    df = df.rename(columns=rename_dict)
 
-# Padronização
+    # 4. Processamento de Texto (Data Cleaning)
+    colunas_texto = [
+        'classe', 'nome_ministro', 'origem_decisao', 'subgrupo andamento decisão', 
+        'andamento decisão', 'ramo_direito', 'assuntos_processo', 'indicador_tramitacao'
+    ]
 
-# Padronização de Nomes, Textos e Conversão de Datas
-df.columns = df.columns.str.strip().str.lower()
+    for c in tqdm(colunas_texto, desc="Limpando strings"):
+        if c in df.columns:
+            # Preenche nulos, converte para string, limpa espaços e coloca em caixa alta
+            df[c] = df[c].fillna('DESCONHECIDO').astype(str).str.strip().str.upper()
 
-colunas_texto = [
-    'classe', 'nome ministro(a)', 'indicador eletrônico', 'indicador virtual', 
-    'indicador colegiado', 'origem da decisão', 'subgrupo andamento decisão', 
-    'andamento decisão', 'ramo direito', 'assuntos do processo', 
-    'indicador de tramitação'
-]
+    # 5. Processamento de Datas (Temporal Analysis)
+    datas = ['data_autuacao', 'data_baixa', 'data_decisao']
+    for d in tqdm(datas, desc="Formatando datas"):
+        if d in df.columns:
+            df[d] = pd.to_datetime(df[d], errors='coerce')
 
-# barra de progresso
-for c in tqdm(colunas_texto, desc="Padronizando colunas de texto"):
-    if c in df.columns:
-        df[c] = df[c].fillna('DESCONHECIDO').astype(str).str.strip().str.upper()
-    else:
-        print(f"Coluna '{c}' não encontrada. Criando com valor 'DESCONHECIDO'.")
-        df[c] = 'DESCONHECIDO'
+    # 6. Feature Engineering (Cálculo de Lead Time e Ano)
+    print("Gerando novas features...")
+    
+    # Extração do ano da decisão
+    if 'data_decisao' in df.columns:
+        df['ano_decisao_extraido'] = df['data_decisao'].dt.year
 
-datas = ['data de autuação', 'data baixa', 'data da decisão']
-for d in tqdm(datas, desc="Convertendo colunas de data"):
-    if d in df.columns:
-        df[d] = pd.to_datetime(df[d], errors='coerce')
-    else:
-        print(f"Coluna '{d}' não encontrada. Criando com NaT.")
-        df[d] = pd.NaT
+    # Cálculo do tempo de julgamento em dias
+    if 'data_baixa' in df.columns and 'data_autuacao' in df.columns:
+        df['tempo_julgamento_dias'] = (df['data_baixa'] - df['data_autuacao']).dt.days
+        
+        # Tratamento de inconsistências: tempos negativos viram nulos
+        df.loc[df['tempo_julgamento_dias'] < 0, 'tempo_julgamento_dias'] = np.nan
 
+    # 7. Conversão Numérica e Tipagem
+    numeric_cols = ['número', 'ano_da_decisao', 'qde de ocorrências processuais']
+    for col in tqdm(numeric_cols, desc="Corrigindo tipos numericos"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
 
-df = df.rename(columns={
-    'nome ministro(a)': 'nome_ministro',
-    'data de autuação': 'data_autuacao',
-    'data baixa': 'data_baixa',
-    'data da decisão': 'data_decisao',
-    'origem da decisão': 'origem_decisao',
-    'ramo direito': 'ramo_direito',
-    'assuntos do processo': 'assuntos_processo',
-    'indicador de tramitação': 'indicador_tramitacao'
-})
+    # 8. Finalização (Deduplicação e Exportação)
+    print("Finalizando processamento...")
+    df = df.drop_duplicates()
+    
+    # Ordenação lógica (Ministro e Data)
+    if 'nome_ministro' in df.columns and 'data_decisao' in df.columns:
+        df = df.sort_values(by=['nome_ministro', 'data_decisao'])
 
-# Criação de Colunas
+    # Salvando a base processada
+    df.to_excel(arquivo_limpo, index=False, engine='openpyxl')
+    
+    print("-" * 30)
+    print(f"Pipeline concluido com sucesso!")
+    print(f"Registros processados: {len(df)}")
+    print(f"Arquivo salvo: {arquivo_limpo}")
+    print("-" * 30)
 
-if 'data_decisao' in df.columns:
-    df['ano_decisao'] = df['data_decisao'].dt.year
-else:
-    df['ano_decisao'] = pd.NA
-
-# Cálculo de tempo de julgamento
-if all(col in df.columns for col in ['data_baixa', 'data_autuacao']):
-    df['tempo_julgamento_dias'] = (df['data_baixa'] - df['data_autuacao']).dt.days
-else:
-    df['tempo_julgamento_dias'] = pd.NA
-
-# Tratamento de Nulos (corrigido: usa pd.NA ao invés de None)
-if 'tempo_julgamento_dias' in df.columns:
-    df['tempo_julgamento_dias'] = df['tempo_julgamento_dias'].apply(
-        lambda x: x if pd.notnull(x) and x >= 0 else pd.NA
-    )
-
-# Remoção de duplicatas
-df = df.drop_duplicates()
-
-# Conversão de colunas numéricas
-numeric_cols = ['número', 'ano da decisão', 'qde de ocorrências processuais']
-for col in tqdm(numeric_cols, desc="Convertendo colunas numéricas"):
-    if col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-
-df['qde de ocorrências processuais'] = df['qde de ocorrências processuais'].fillna(0)
-
-
-print(df.info())
-print(df.head())
-print(df['tempo_julgamento_dias'].describe())
-
-# Exportar Novo Arquivo Limpo
-arquivo_limpo = r'C:\Users\joaoh\OneDrive\Área de Trabalho\Projeto_STF\decisoes_stf_limpo.xlsx'
-
-os.makedirs(os.path.dirname(arquivo_limpo), exist_ok=True)
-
-df.to_excel(arquivo_limpo, index=False, engine='openpyxl')
-
-print(f"\n Arquivo limpo salvo com sucesso em: {arquivo_limpo}")
-
-input()
+if __name__ == "__main__":
+    limpar_dados_stf()
+    input("\nPressione Enter para sair...")
